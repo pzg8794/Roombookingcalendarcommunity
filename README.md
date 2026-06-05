@@ -1,1 +1,11 @@
-# repo-template
+
+  # Room Booking Calendar (Community)
+
+  This is a code bundle for Room Booking Calendar (Community). The original project is available at https://www.figma.com/design/bWXV6IYgOpVFgEavJQrcDS/Room-Booking-Calendar--Community-.
+
+  ## Running the code
+
+  Run `npm i` to install the dependencies.
+
+  Run `npm run dev` to start the development server.
+  
