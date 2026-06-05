@@ -6,7 +6,7 @@ import {
 import {
   CalendarDays, LayoutList, Building2, Settings, ChevronLeft,
   ChevronRight, Search, Plus, Bell, User, Filter, MoreHorizontal,
-  MapPin, Clock, Users, BarChart3, Home,
+  MapPin, Clock, Users, BarChart3, Home, X, CheckSquare, Square,
 } from 'lucide-react';
 import type { Booking } from './components/BookingPanel';
 import { MultiBookingModal, type BookingFormData, type RoomInfo } from './components/MultiBookingModal';
@@ -83,6 +83,16 @@ export default function App() {
   const [bookings, setBookings]           = useState<Booking[]>(INITIAL_BOOKINGS);
   const [activeNav, setActiveNav]         = useState<NavItem>('calendar');
   const [navExpanded, setNavExpanded]     = useState(false);
+
+  // Search
+  const [searchOpen, setSearchOpen]       = useState(false);
+  const [searchQuery, setSearchQuery]     = useState('');
+  const searchInputRef                    = useRef<HTMLInputElement>(null);
+
+  // Filter
+  const [filterOpen, setFilterOpen]       = useState(false);
+  const [activeRoomFilters, setActiveRoomFilters] = useState<Set<string>>(new Set(['all', ...ROOMS.map(r => r.id)]));
+  const filterRef                         = useRef<HTMLDivElement>(null);
 
   // Single-cell modal
   const [singleDate, setSingleDate]       = useState<Date | null>(null);
@@ -180,6 +190,56 @@ export default function App() {
   useEffect(() => {
     document.body.style.userSelect = isDraggingRef.current ? 'none' : '';
   });
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterOpen]);
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 50);
+  }, [searchOpen]);
+
+  const toggleRoomFilter = (id: string) => {
+    setActiveRoomFilters(prev => {
+      const next = new Set(prev);
+      if (id === 'all') {
+        // Toggle all: if all selected → clear all, else select all
+        if (next.size === ALL_ROWS.length) {
+          next.clear();
+        } else {
+          ALL_ROWS.forEach(r => next.add(r.id));
+        }
+      } else {
+        next.has(id) ? next.delete(id) : next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const visibleRows = ALL_ROWS.filter(r =>
+    activeRoomFilters.size === 0 || activeRoomFilters.has(r.id)
+  );
+
+  const searchMatchesRow = (room: RoomInfo): boolean => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const nameMatch = room.name.toLowerCase().includes(q);
+    const bookingMatch = bookings.some(b =>
+      b.roomId === room.id &&
+      format(b.date, 'yyyy-MM') === format(currentMonth, 'yyyy-MM') &&
+      b.bookedBy.toLowerCase().includes(q)
+    );
+    return nameMatch || bookingMatch;
+  };
 
   // ── Booking handlers ───────────────────────────────────────────────────────
   const handleMultiBookingConfirm = (data: BookingFormData) => {
@@ -428,14 +488,40 @@ export default function App() {
 
           {/* Action icons */}
           <div className="flex items-center gap-1">
-            <button
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ color: MD3.onSurfaceVariant }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = MD3.surfaceVariant)}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              <Search className="w-4 h-4" />
-            </button>
+            {/* Expanding search */}
+            <div className="flex items-center gap-1 transition-all duration-200" style={{ width: searchOpen ? 220 : 36 }}>
+              {searchOpen && (
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border flex-1"
+                  style={{ borderColor: MD3.primary, backgroundColor: MD3.primaryContainer }}
+                >
+                  <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: MD3.primary }} />
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); } }}
+                    placeholder="Search rooms or bookings…"
+                    className="text-xs bg-transparent outline-none flex-1 min-w-0"
+                    style={{ color: MD3.onPrimaryContainer }}
+                  />
+                  <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ color: MD3.primary }}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              {!searchOpen && (
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ color: MD3.onSurfaceVariant }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = MD3.surfaceVariant)}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <button
               className="w-9 h-9 rounded-full flex items-center justify-center relative"
               style={{ color: MD3.onSurfaceVariant }}
@@ -462,7 +548,7 @@ export default function App() {
         </header>
 
         {/* ── Toolbar ─────────────────────────────────────────────────── */}
-        <div
+        {activeNav === 'calendar' && <div
           className="flex items-center gap-3 px-6 py-2 flex-shrink-0"
           style={{
             backgroundColor: MD3.surface,
@@ -495,23 +581,27 @@ export default function App() {
 
           {/* Room filter chips */}
           <div className="flex items-center gap-2">
-            {[ALL_ROOMS_ROW, ...ROOMS].map(room => (
-              <div
-                key={room.id}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border cursor-pointer"
-                style={{
-                  borderColor: room.color,
-                  color: room.color,
-                  backgroundColor: 'transparent',
-                }}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: room.color }}
-                />
-                {room.name === 'All Rooms' ? 'All' : room.name.split(' ').slice(-1)[0]}
-              </div>
-            ))}
+            {[ALL_ROOMS_ROW, ...ROOMS].map(room => {
+              const on = activeRoomFilters.has(room.id);
+              return (
+                <button
+                  key={room.id}
+                  onClick={() => toggleRoomFilter(room.id)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border cursor-pointer transition-all"
+                  style={{
+                    borderColor: room.color,
+                    color: on ? '#fff' : room.color,
+                    backgroundColor: on ? room.color : 'transparent',
+                  }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: on ? 'rgba(255,255,255,0.7)' : room.color }}
+                  />
+                  {room.name === 'All Rooms' ? 'All' : room.name.split(' ').slice(-1)[0]}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex-1" />
@@ -521,15 +611,96 @@ export default function App() {
             Click a cell to view · Drag to multi-book
           </span>
 
-          {/* Filter button */}
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
-            style={{ borderColor: MD3.outline, color: MD3.onSurfaceVariant }}
-          >
-            <Filter className="w-3.5 h-3.5" />
-            Filter
-          </button>
-        </div>
+          {/* Filter button + dropdown */}
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setFilterOpen(p => !p)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+              style={{
+                borderColor: filterOpen ? MD3.primary : MD3.outline,
+                color: filterOpen ? MD3.primary : MD3.onSurfaceVariant,
+                backgroundColor: filterOpen ? MD3.primaryContainer : 'transparent',
+              }}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              Filter
+              {activeRoomFilters.size < ALL_ROWS.length && (
+                <span
+                  className="ml-0.5 w-4 h-4 rounded-full text-xs flex items-center justify-center font-bold"
+                  style={{ backgroundColor: MD3.primary, color: '#fff' }}
+                >
+                  {ALL_ROWS.length - activeRoomFilters.size}
+                </span>
+              )}
+            </button>
+
+            {filterOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 w-64 rounded-2xl shadow-xl z-50 overflow-hidden"
+                style={{ backgroundColor: MD3.surface, border: `1px solid ${MD3.outlineVariant}` }}
+              >
+                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold" style={{ color: MD3.onBackground }}>Filter Rooms</span>
+                  <button
+                    onClick={() => setActiveRoomFilters(new Set(ALL_ROWS.map(r => r.id)))}
+                    className="text-xs"
+                    style={{ color: MD3.primary }}
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="px-2 pb-3 space-y-0.5">
+                  {ALL_ROWS.map(room => {
+                    const checked = activeRoomFilters.has(room.id);
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => toggleRoomFilter(room.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors"
+                        style={{ backgroundColor: checked ? room.bgColor : 'transparent' }}
+                      >
+                        {checked
+                          ? <CheckSquare className="w-4 h-4 flex-shrink-0" style={{ color: room.color }} />
+                          : <Square className="w-4 h-4 flex-shrink-0" style={{ color: MD3.outline }} />
+                        }
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: room.color }}
+                        />
+                        <span className="text-xs font-medium flex-1" style={{ color: checked ? room.color : MD3.onSurfaceVariant }}>
+                          {room.name}
+                        </span>
+                        <span className="text-xs" style={{ color: MD3.onSurfaceVariant }}>
+                          {room.capacity} seats
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Weekend toggle */}
+                <div className="px-4 py-3 border-t" style={{ borderColor: MD3.outlineVariant }}>
+                  <p className="text-xs font-semibold mb-2" style={{ color: MD3.onBackground }}>Show Weekends</p>
+                  <div className="flex gap-2">
+                    {['Yes', 'No'].map(opt => (
+                      <button
+                        key={opt}
+                        className="flex-1 py-1.5 rounded-full text-xs font-medium border transition-colors"
+                        style={{
+                          backgroundColor: opt === 'Yes' ? MD3.secondaryContainer : 'transparent',
+                          color: opt === 'Yes' ? MD3.onSecondaryContainer : MD3.onSurfaceVariant,
+                          borderColor: MD3.outlineVariant,
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>}
 
         {/* ── List View ────────────────────────────────────────────────── */}
         {activeNav === 'list' && (
@@ -547,7 +718,7 @@ export default function App() {
         )}
 
         {/* ── Calendar Grid ────────────────────────────────────────────── */}
-        {activeNav !== 'list' && <div className="flex-1 overflow-auto relative" style={{ userSelect: 'none' }}>
+        {activeNav === 'calendar' && <div className="flex-1 overflow-auto relative" style={{ userSelect: 'none' }}>
           <table
             className="border-collapse"
             style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}
@@ -625,10 +796,11 @@ export default function App() {
 
             {/* Room rows */}
             <tbody>
-              {ALL_ROWS.map((room, rowIdx) => {
+              {visibleRows.map((room, rowIdx) => {
                 const isAllRow = room.id === 'all';
+                const dimmed = searchQuery.trim() !== '' && !searchMatchesRow(room);
                 return (
-                  <tr key={room.id}>
+                  <tr key={room.id} style={{ opacity: dimmed ? 0.25 : 1, transition: 'opacity 0.15s' }}>
                     {/* Room label */}
                     <td
                       style={{
@@ -771,7 +943,7 @@ export default function App() {
         </div>}
 
         {/* ── Bottom Status Bar ────────────────────────────────────────── */}
-        <div
+        {activeNav === 'calendar' && <div
           className="flex items-center gap-6 px-6 py-2 flex-shrink-0"
           style={{
             backgroundColor: MD3.surface,
@@ -796,7 +968,7 @@ export default function App() {
           <span className="text-xs" style={{ color: MD3.onSurfaceVariant }}>
             Total bookings this month: <strong style={{ color: MD3.onBackground }}>{totalMonth}</strong>
           </span>
-        </div>
+        </div>}
       </div>
 
       {/* ── FAB ─────────────────────────────────────────────────────────── */}
