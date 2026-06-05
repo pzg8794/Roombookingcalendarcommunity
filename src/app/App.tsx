@@ -11,6 +11,9 @@ import {
 import type { Booking } from './components/BookingPanel';
 import { MultiBookingModal, type BookingFormData, type RoomInfo } from './components/MultiBookingModal';
 import { DayDetailsModal } from './components/DayDetailsModal';
+import { ListView } from './components/ListView';
+import { RoomsView } from './components/RoomsView';
+import { AnalyticsView } from './components/AnalyticsView';
 
 // ─── MD3 Design Tokens ────────────────────────────────────────────────────────
 const MD3 = {
@@ -528,8 +531,23 @@ export default function App() {
           </button>
         </div>
 
+        {/* ── List View ────────────────────────────────────────────────── */}
+        {activeNav === 'list' && (
+          <ListView bookings={bookings} rooms={ROOMS} />
+        )}
+
+        {/* ── Rooms View ───────────────────────────────────────────────── */}
+        {activeNav === 'rooms' && (
+          <RoomsView rooms={ROOMS} bookings={bookings} />
+        )}
+
+        {/* ── Analytics View ───────────────────────────────────────────── */}
+        {activeNav === 'analytics' && (
+          <AnalyticsView rooms={ROOMS} bookings={bookings} currentMonth={currentMonth} />
+        )}
+
         {/* ── Calendar Grid ────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto relative" style={{ userSelect: 'none' }}>
+        {activeNav !== 'list' && <div className="flex-1 overflow-auto relative" style={{ userSelect: 'none' }}>
           <table
             className="border-collapse"
             style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}
@@ -750,7 +768,7 @@ export default function App() {
               })}
             </tbody>
           </table>
-        </div>
+        </div>}
 
         {/* ── Bottom Status Bar ────────────────────────────────────────── */}
         <div
