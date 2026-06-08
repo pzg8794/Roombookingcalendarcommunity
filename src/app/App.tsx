@@ -14,6 +14,8 @@ import { DayDetailsModal } from './components/DayDetailsModal';
 import { ListView } from './components/ListView';
 import { RoomsView } from './components/RoomsView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { NotificationsPanel } from './components/NotificationsPanel';
+import { SettingsPanel } from './components/SettingsPanel';
 
 // ─── MD3 Design Tokens ────────────────────────────────────────────────────────
 const MD3 = {
@@ -83,6 +85,10 @@ export default function App() {
   const [bookings, setBookings]           = useState<Booking[]>(INITIAL_BOOKINGS);
   const [activeNav, setActiveNav]         = useState<NavItem>('calendar');
   const [navExpanded, setNavExpanded]     = useState(false);
+
+  // Panels
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showSettings, setShowSettings]           = useState(false);
 
   // Search
   const [searchOpen, setSearchOpen]       = useState(false);
@@ -370,8 +376,12 @@ export default function App() {
         {/* Bottom section */}
         <div className="flex flex-col gap-1 w-full px-2 mt-auto">
           <button
+            onClick={() => { setShowSettings(p => !p); setShowNotifications(false); }}
             className="flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-150 w-full overflow-hidden"
-            style={{ color: MD3.onSurfaceVariant }}
+            style={{
+              backgroundColor: showSettings ? MD3.secondaryContainer : 'transparent',
+              color: showSettings ? MD3.onSecondaryContainer : MD3.onSurfaceVariant,
+            }}
           >
             <Settings className="w-5 h-5 flex-shrink-0" />
             <span
@@ -523,10 +533,14 @@ export default function App() {
               )}
             </div>
             <button
+              onClick={() => { setShowNotifications(p => !p); setShowSettings(false); }}
               className="w-9 h-9 rounded-full flex items-center justify-center relative"
-              style={{ color: MD3.onSurfaceVariant }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = MD3.surfaceVariant)}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+              style={{
+                color: showNotifications ? MD3.primary : MD3.onSurfaceVariant,
+                backgroundColor: showNotifications ? MD3.primaryContainer : 'transparent',
+              }}
+              onMouseEnter={e => { if (!showNotifications) e.currentTarget.style.backgroundColor = MD3.surfaceVariant; }}
+              onMouseLeave={e => { if (!showNotifications) e.currentTarget.style.backgroundColor = 'transparent'; }}
             >
               <Bell className="w-4 h-4" />
               {totalToday > 0 && (
@@ -1015,6 +1029,20 @@ export default function App() {
           onAddBooking={handleAddSingleBooking}
         />
       )}
+
+      {/* ── Notifications Panel ──────────────────────────────────────────── */}
+      <NotificationsPanel
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        bookings={bookings}
+        rooms={ROOMS}
+      />
+
+      {/* ── Settings Panel ───────────────────────────────────────────────── */}
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 }
